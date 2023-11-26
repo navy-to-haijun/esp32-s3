@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include "esp_log.h"
 #include "driver/i2c.h"
+#include "eMPL/inv_mpu.h"
+#include "eMPL/inv_mpu_dmp_motion_driver.h"
 
 #define I2C_MASTER_SCL_IO           8       // 时钟线
 #define I2C_MASTER_SDA_IO           18      // 数据线
@@ -60,4 +62,10 @@ extern esp_err_t mpu6050_get_temperature(float *temp);
 extern esp_err_t mpu6050_get_gyroscope(float *gxyz);
 extern esp_err_t mpu6050_get_accelerometer(float *axyz);
 
+/*适配MDP*/
+extern esp_err_t esp32s3_i2c_write_bytes(uint8_t slave_addr, uint8_t reg_addr, uint8_t length, uint8_t *data);
+extern esp_err_t esp32s3_i2c_read_bytes(uint8_t slave_addr, uint8_t reg_addr,uint8_t length, uint8_t *data);
+extern int esp32s3_delay_ms(unsigned long num_ms);
+extern int esp32s3_get_clock_ms(unsigned long *count);
+extern esp_err_t MDP_init(void);
 #endif
