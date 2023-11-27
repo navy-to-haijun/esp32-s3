@@ -5,27 +5,9 @@ static signed char gyro_orientation[9] = {-1, 0, 0,
                                            0,-1, 0,
                                            0, 0, 1};
 
-/**
- * @brief Read a sequence of bytes from a MPU9250 sensor registers
- */
-esp_err_t mpu6050_register_read(uint8_t reg_addr, uint8_t *data, size_t len)
-{
-    return i2c_master_write_read_device(I2C_MASTER_NUM, MPU_DEFAULT_ADDRESS, &reg_addr, 1, data, len, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
-}
 
 /**
- * @brief 写数据(单字节)
- */
-esp_err_t mpu6050_register_write_byte(uint8_t reg_addr, uint8_t data)
-{
-    int ret;
-    uint8_t write_buf[2] = {reg_addr, data};
-    ret = i2c_master_write_to_device(I2C_MASTER_NUM, MPU_DEFAULT_ADDRESS, write_buf, sizeof(write_buf), I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
-    return ret;
-}
-
-/**
- * @brief 写数据(多字节)
+ * @brief 写数据
  */
 esp_err_t esp32s3_i2c_write_bytes(uint8_t slave_addr, uint8_t reg_addr, uint8_t length, uint8_t *data)
 {
@@ -50,7 +32,7 @@ esp_err_t esp32s3_i2c_write_bytes(uint8_t slave_addr, uint8_t reg_addr, uint8_t 
     return ret;
 }
 /**
- * @brief 读数据(多字节)
+ * @brief 读数据
  *      
 */
 esp_err_t esp32s3_i2c_read_bytes(uint8_t slave_addr, uint8_t reg_addr,uint8_t length, uint8_t *data)
@@ -90,11 +72,11 @@ int esp32s3_delay_ms(unsigned long num_ms)
     return 0;
 }
 /**
- *  @brief 获取时间，适配MDP（空函数，没用）
+ *  @brief 获取时间，适配MDP
 */
 int esp32s3_get_clock_ms(unsigned long *count)
 {
-    *count = (unsigned long)xTaskGetTickCount() * 10;
+    *count = xTaskGetTickCount() * 10;
     return 0;
 }
 
@@ -118,112 +100,7 @@ esp_err_t i2c_master_init(void)
 
     return i2c_driver_install(i2c_master_port, conf.mode, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0);
 }
-/**
-* @brief 读取温度值
-*/
-esp_err_t mpu6050_get_temperature(float *temp)
-{
-    int ret;
-    uint8_t data[2];
-    int16_t raw;
-    ret = mpu6050_register_read(MPU_TEMP_OUTH_REG, data, 2);
-    raw = (int16_t)((data[0] << 8) + data[1]);
-    *temp = 36.53 + raw/340.0;
-    return ret;
-}
-/**
- * @brief 读取陀螺仪值
-*/
-esp_err_t mpu6050_get_gyroscope(float *gxyz)
-{
-    int ret;
-    uint8_t data[6];
-    int16_t raw_gxyz[3];
-    float LSB[4] = {131.0, 65.5, 32.8, 16.4};
-    /*读取原始数据*/
-    ret = mpu6050_register_read(MPU_GYRO_XOUTH_REG, data, 6);
-    if (ret == ESP_OK)
-    {
-        /*转化原始数据*/
-        raw_gxyz[0] = (int16_t)((data[0] << 8) + data[1]);
-        raw_gxyz[1] = (int16_t)((data[2] << 8) + data[3]);
-        raw_gxyz[2] = (int16_t)((data[4] << 8) + data[5]);
-    }
-    /*读取量程*/
-    ret = mpu6050_register_read(MPU_GYRO_CFG_REG, data, 1);
-        
-    if (ret == ESP_OK)
-    {
-        uint8_t a = (data[0] & 0X18) >> 3;
-        // 实际值
-        for (uint8_t i = 0; i < 3; i++)
-        {
-            gxyz[i] =raw_gxyz[i] / LSB[a];
-        }
-    }
-    
-    return ret; 
-}
-/**
- * @brief 读取加速度值
-*/
-esp_err_t mpu6050_get_accelerometer(float *axyz)
-{
-    int ret;
-    uint8_t data[6];
-    int16_t raw_axyz[3];
-    float LSB[4] = {16384.0, 8192.0, 4096.0, 2048.0};
-    /*原始值*/
-    ret = mpu6050_register_read(MPU_ACCEL_XOUTH_REG, data, 6);
-    if (ret == ESP_OK)
-    {
-        raw_axyz[0] = (int16_t)((data[0] << 8) + data[1]);
-        raw_axyz[1] = (int16_t)((data[2] << 8) + data[3]);
-        raw_axyz[2] = (int16_t)((data[4] << 8) + data[5]);
-    }
-    /*读取量程*/
-    ret = mpu6050_register_read(MPU_ACCEL_CFG_REG, data, 1);
-    if (ret == ESP_OK)
-    {
-        uint8_t a = (data[0] & 0X18) >> 3 ;
-        /*转化为实际值*/
-        for (uint8_t i = 0; i < 3; i++)
-        {
-            axyz[i] =raw_axyz[i] / LSB[a];
-        }
-        
-    }
-    return ret; 
-}
-/**
- * @brief MDP初始化
-*/
-void mpu6050_init(void)
-{
 
-    // uint8_t data;
-    //  /*读取设备ID，判断I2C通信是否正常*/
-    // ESP_ERROR_CHECK(esp32s3_i2c_read_bytes(MPU_DEFAULT_ADDRESS, MPU_DEVICE_ID_REG, 1, &data));
-    // ESP_LOGI("mpu6050 init", "WHO_AM_I = %X", data);
-    // /*重置设备*/
-    // data = 0x80;
-    // ESP_ERROR_CHECK(esp32s3_i2c_write_bytes(MPU_DEFAULT_ADDRESS, MPU_PWR_MGMT1_REG, 1, &data));
-    // vTaskDelay(100 / portTICK_PERIOD_MS);
-    // /*禁用睡眠模式，选择X轴陀螺仪为时钟源*/
-    // data = 0x01;
-    //  ESP_ERROR_CHECK(esp32s3_i2c_write_bytes(MPU_DEFAULT_ADDRESS, MPU_PWR_MGMT1_REG, 1, &data));
-    // /*配置数字低通滤波器，带宽为5，陀螺仪输出频率为1kHz*/
-    // data = 0x06;
-    // ESP_ERROR_CHECK(esp32s3_i2c_write_bytes(MPU_DEFAULT_ADDRESS, MPU_CFG_REG, 1, &data));
-    // /*配置采样频率:100Hz*/
-    // data = 9;
-    // ESP_ERROR_CHECK(esp32s3_i2c_write_bytes(MPU_DEFAULT_ADDRESS, MPU_SAMPLE_RATE_REG, 1, &data));
-    /*配置陀螺仪量程:± 2000 °/s, 不自检*/
-    // data = 0x18;
-    // ESP_ERROR_CHECK(esp32s3_i2c_write_bytes(MPU_DEFAULT_ADDRESS, MPU_GYRO_CFG_REG, 1, &data));
-    /*配置加速度计量程: ± 16g， 不自检*/
-    // ESP_ERROR_CHECK(esp32s3_i2c_write_bytes(MPU_DEFAULT_ADDRESS, MPU_ACCEL_CFG_REG, 1, &data));
-}
 
 /* These next two functions converts the orientation matrix (see
  * gyro_orientation) to a scalar representation for use by the DMP.
@@ -311,34 +188,20 @@ esp_err_t MDP_init(void)
 {
     int  ret;
     /*MPU6050初始化*/
-    // mpu6050_init();
     ret = mpu_init(NULL);
-
 
     if (ret != 0)
         printf("0, %d\n", ret);
-
     /*唤醒*/
     ret = mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL);
-    if (ret != 0)
-        printf("1, %d\n", ret);
-
     /*将加速度和陀螺仪数据放入FIFO中*/
     ret=mpu_configure_fifo(INV_XYZ_GYRO | INV_XYZ_ACCEL);
-    if (ret != 0)
-        printf("2, %d\n", ret);
     /*设置采样频率*/
     mpu_set_sample_rate(100);
-    if (ret != 0)
-        printf("3, %d\n", ret);
     /*加载内存*/
     dmp_load_motion_driver_firmware();
-    if (ret != 0)
-        printf("3, %d\n", ret);
     /*设置方向*/
     dmp_set_orientation(inv_orientation_matrix_to_scalar(gyro_orientation));
-    if (ret != 0)
-        printf("4, %d\n", ret);
     /*启用功能
     * DMP_FEATURE_6X_LP_QUAT:产生四元数
     * DMP_FEATURE_TAP：检测敲击事件
@@ -351,8 +214,6 @@ esp_err_t MDP_init(void)
         DMP_FEATURE_ANDROID_ORIENT | DMP_FEATURE_SEND_RAW_ACCEL | DMP_FEATURE_SEND_CAL_GYRO |
         DMP_FEATURE_GYRO_CAL;
     dmp_enable_feature(dmp_features);
-    if (ret != 0)
-        printf("5, %d\n", ret);
     dmp_set_fifo_rate(100);
     if (ret != 0)
         printf("6, %d\n", ret);
@@ -364,4 +225,69 @@ esp_err_t MDP_init(void)
 
     return ret;
 
+}
+
+/* q30 系数*/
+#define q30  1073741824.0f
+static const char *TAG = "mpu6050-task";
+
+
+/**
+ *@brief mpu6050 task
+ * 将数据放在队列中
+*/
+void mpu6050_task(void *pvParameters)
+{
+    unsigned long sensor_timestamp=0;
+    short gyro[3], accel[3], sensors;
+    unsigned char more;
+    long quat[4];
+    float q0=1.0f,q1=0.0f,q2=0.0f,q3=0.0f;
+    float pitch, roll, yaw;
+    int16_t mpu6050_data[3];
+    BaseType_t xStatus;
+    /*初始化I2C*/
+    ESP_ERROR_CHECK(i2c_master_init());
+    /*初始化MPU和MDP*/
+    if(MDP_init() == ESP_OK)
+        ESP_LOGI(TAG, "I2C and mpu6050 initialized successfully");
+    vTaskDelay(50 / portTICK_PERIOD_MS);
+    
+    while (1)
+    {
+        /*
+         * gyro：陀螺仪；accel：加速度：sensor_timestamp：时间戳
+         * sensors：判断有那些数据被读出；more：FIFO中是否还有数据
+        */
+        if(dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more) == ESP_OK)
+        {
+            if(sensors & INV_WXYZ_QUAT)
+            {
+                /*转化为欧拉角*/
+                q0 = quat[0] / q30;	
+                q1 = quat[1] / q30;
+                q2 = quat[2] / q30;
+                q3 = quat[3] / q30;
+
+                pitch = asin(-2 * q1 * q3 + 2 * q0* q2)* 57.3;	// pitch
+                roll  = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2* q2 + 1)* 57.3;	// roll
+                yaw   = atan2(2*(q1*q2 + q0*q3),q0*q0+q1*q1-q2*q2-q3*q3) * 57.3;	//yaw
+                /*发送数据*/
+                mpu6050_data[0] = (int16_t)(roll * 100);
+                mpu6050_data[1] = (int16_t)(pitch * 100);
+                mpu6050_data[2] = (int16_t)(yaw * 100);
+                xStatus = xQueueSend(mpu6050data_queue, mpu6050_data, 0);
+                if (xStatus != pdPASS)
+                {
+                    ESP_LOGE(TAG, "Could not send to the queue.");
+                }
+            
+                // ESP_LOGI(TAG, "mputimerstamp = %ld", sensor_timestamp);
+                // ESP_LOGI(TAG, "%.2f, %.2f, %.2f,", pitch, roll, yaw);
+            }
+
+        }
+
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+    }
 }
