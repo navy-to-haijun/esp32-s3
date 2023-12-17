@@ -1,3 +1,5 @@
-idf_component_register(SRCS "mpu6050_main.c"
+set(src)
+file(GLOB src ./*.c)
+idf_component_register(SRCS ${src}
                     INCLUDE_DIRS "."
                    )

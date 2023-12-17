@@ -11,6 +11,15 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 
+/**
+ * float转uint8，用于传输float数据
+*/
+typedef union 
+{
+    uint8_t u8data[4];
+    float fdata;
+}float_to_u8;
+
 #define I2C_MASTER_SCL_IO           8       // 时钟线
 #define I2C_MASTER_SDA_IO           18      // 数据线
 #define I2C_MASTER_NUM              0       // I2C master i2c port number
