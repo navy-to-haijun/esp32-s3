@@ -2,7 +2,7 @@
 # include "mpu6050.h"
 
 static const char *TAG = "UDP client task";
-#define HOST_IP_ADDR  "192.168.7.7"
+#define HOST_IP_ADDR  "192.168.7.10"
 #define PORT 8888
 
 #define ESP_WIFI_SSID      "CU_7daysinn301"
@@ -82,6 +82,7 @@ void wifi_init_sta(void)
 
 void udp_client_task(void *pvParameters)
 {
+    uint8_t max_reconnect = 5;
     int addr_family = 0;
     int ip_protocol = 0;
     BaseType_t xStatus;
@@ -91,8 +92,9 @@ void udp_client_task(void *pvParameters)
     /*超时时间:20ms*/
     const TickType_t xTicksToWait = pdMS_TO_TICKS(20);
 
-    while(1)
+    while(max_reconnect)
     {
+        max_reconnect--;
         struct sockaddr_in dest_addr;
         dest_addr.sin_addr.s_addr = inet_addr(HOST_IP_ADDR);
         dest_addr.sin_family = AF_INET;
@@ -112,35 +114,23 @@ void udp_client_task(void *pvParameters)
         setsockopt (sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
 
         ESP_LOGI(TAG, "Socket created, sending to %s:%d", HOST_IP_ADDR, PORT);
-        vTaskDelay(50 / portTICK_PERIOD_MS);
-
-        float_to_u8 euler_mpu[3];
-        /*初值*/
-        euler_mpu[0].fdata = 0.0001;
-        euler_mpu[1].fdata = 1.1234;
-        euler_mpu[2].fdata = 123.123;
-
 
         while(1)
         {
-            /*发送*/
-            sendto(sock, euler_mpu, sizeof(euler_mpu), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-            /*修改值*/
-            euler_mpu[0].fdata += 0.0001;
-            euler_mpu[1].fdata += 0.1;
-            euler_mpu[2].fdata += 100;
-        //     xStatus = xQueueReceive(mpu6050data_queue, senddata, xTicksToWait);
-        //     if(xStatus == pdPASS)
-        //     {
-        //         /*发送*/
-        //         int err = sendto(sock, senddata, sizeof(senddata), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-        //         if (err < 0)
-        //         {
-        //             ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
-        //             break;
-        //         }
-        //     }
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            xStatus = xQueueReceive(mpu6050data_queue, senddata, xTicksToWait);
+            if(xStatus == pdPASS)
+            {
+                /*发送*/
+                int err = sendto(sock, senddata, sizeof(senddata), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+                // printf("%.2f, %.2f, %.2f\n", senddata[0].fdata, senddata[1].fdata, senddata[2].fdata);
+                if (err < 0)
+                {
+                    ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
+                    break;
+                }
+            }
+            // vTaskDelay(20 / portTICK_PERIOD_MS);
         }
+        close(sock);
     }
 }

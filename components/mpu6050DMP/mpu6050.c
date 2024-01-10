@@ -273,8 +273,8 @@ void mpu6050_task(void *pvParameters)
                 q2 = quat[2] / q30;
                 q3 = quat[3] / q30;
 
-                euler_mpu[0].fdata = asin(-2 * q1 * q3 + 2 * q0* q2)* 57.3;	// pitch
-                euler_mpu[1].fdata = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2* q2 + 1)* 57.3;	// roll
+                euler_mpu[1].fdata = asin(-2 * q1 * q3 + 2 * q0* q2)* 57.3;	// pitch
+                euler_mpu[0].fdata = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2* q2 + 1)* 57.3;	// roll
                 euler_mpu[2].fdata = atan2(2*(q1*q2 + q0*q3),q0*q0+q1*q1-q2*q2-q3*q3) * 57.3;	//yaw
             
                 xStatus = xQueueSend(mpu6050data_queue, euler_mpu, 0);

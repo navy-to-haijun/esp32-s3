@@ -52,7 +52,7 @@ void app_main(void)
      {
         ESP_LOGI(TAG, "Wifi connection successful");
         /*创建任务*/
-        // xTaskCreate(mpu6050_task, "mpu6050_task", 1024*10, NULL, 5, NULL);
+        xTaskCreate(mpu6050_task, "mpu6050_task", 1024*10, NULL, 5, NULL);
         xTaskCreate(udp_client_task, "udp_client_task", 1024*10, NULL, 7, NULL);
     } 
     else if (bits & WIFI_FAIL_BIT) 
