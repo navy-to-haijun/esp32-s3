@@ -1,3 +1,3 @@
 # README
 
-读取MPU6050原始数据
+移植cherryUSB
