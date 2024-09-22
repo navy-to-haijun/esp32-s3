@@ -102,12 +102,17 @@ void app_main(void)
     // gptimer_start(gptimer);
 
     gpio_set_level(ENABLE_GPIO, 1);
-    
+    /*0下 1上*/
    while (1)
    {
-        set_pluse_count(gptimer, &expected_value, 1600, 1);
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-        set_pluse_count(gptimer, &expected_value, 1600, 0);
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        set_pluse_count(gptimer, &expected_value, 800, 0);  // 下
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        set_pluse_count(gptimer, &expected_value, 800, 1);  // 上
+        /*等待2.5分钟 */
+        for(uint8_t i=0; i< 30; i++)
+        {
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            ESP_LOGI(TAG, "wiating %d s...", 5*(i+1));
+        }
    }
 }
