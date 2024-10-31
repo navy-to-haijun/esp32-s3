@@ -26,6 +26,7 @@
  *---------------------------------------------------------------------------*/
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "driver/gpio.h"
 
 #ifndef __DAP_CONFIG_H__
 #define __DAP_CONFIG_H__
@@ -57,7 +58,7 @@ This information includes:
 /// Processor Clock of the Cortex-M MCU used in the Debug Unit.
 /// This value is used to calculate the SWD/JTAG clock speed.
 // 时钟频率
-#define CPU_CLOCK               100000000U      ///< Specifies the CPU Clock in Hz.
+#define CPU_CLOCK               240000000U      ///< Specifies the CPU Clock in Hz.
 
 /// Number of processor cycles for I/O Port write operations.
 /// This value is used to calculate the SWD/JTAG clock speed that is generated with I/O
@@ -66,7 +67,7 @@ This information includes:
 /// a Cortex-M0+ processor with high-speed peripheral I/O only 1 processor cycle might be
 /// required.
 // IO引脚写操作的处理周期数
-#define IO_PORT_WRITE_CYCLES    2U              ///< I/O Cycles: 2=default, 1=Cortex-M0+ fast I/0.
+#define IO_PORT_WRITE_CYCLES    1U              ///< I/O Cycles: 2=default, 1=Cortex-M0+ fast I/0.
 
 /// Indicate that Serial Wire Debug (SWD) communication mode is available at the Debug Access Port.
 /// This information is returned by the command \ref DAP_Info as part of <b>Capabilities</b>.
@@ -76,7 +77,7 @@ This information includes:
 /// Indicate that JTAG communication mode is available at the Debug Port.
 /// This information is returned by the command \ref DAP_Info as part of <b>Capabilities</b>.
 // 是否使能JTAG
-#define DAP_JTAG                1               ///< JTAG Mode: 1 = available, 0 = not available.
+#define DAP_JTAG                0               ///< JTAG Mode: 1 = available, 0 = not available.
 
 /// Configure maximum number of JTAG devices on the scan chain connected to the Debug Access Port.
 /// This setting impacts the RAM requirements of the Debug Unit. Valid range is 1 .. 255.
@@ -86,20 +87,26 @@ This information includes:
 /// Default communication mode on the Debug Access Port.
 /// Used for the command \ref DAP_Connect when Port Default mode is selected.
 // 默认的通信方式
+#if (DAP_SWD == 1)
 #define DAP_DEFAULT_PORT        1U              ///< Default JTAG/SWJ Port Mode: 1 = SWD, 2 = JTAG.
+#elif (DAP_JTAG == 1)
+#define DAP_DEFAULT_PORT        2U
+#else
+#error Must enable DAP_SWD and/or DAP_JTAG
+#endif
 
 /// Default communication speed on the Debug Access Port for SWD and JTAG mode.
 /// Used to initialize the default SWD/JTAG clock frequency.
 /// The command \ref DAP_SWJ_Clock can be used to overwrite this default setting.
 // 默认的通信速率
-#define DAP_DEFAULT_SWJ_CLOCK   1000000U        ///< Default SWD/JTAG clock frequency in Hz.
+#define DAP_DEFAULT_SWJ_CLOCK   4000000U        ///< Default SWD/JTAG clock frequency in Hz.
 
 /// Maximum Package Size for Command and Response data.
 /// This configuration settings is used to optimize the communication performance with the
 /// debugger and depends on the USB peripheral. Typical vales are 64 for Full-speed USB HID or WinUSB,
 /// 1024 for High-speed USB HID and 512 for High-speed USB WinUSB.
 // 相应命令的包大小
-#define DAP_PACKET_SIZE         512U            ///< Specifies Packet Size in bytes.
+#define DAP_PACKET_SIZE         64U            ///< Specifies Packet Size in bytes.
 
 /// Maximum Package Buffers for Command and Response data.
 /// This configuration settings is used to optimize the communication performance with the
@@ -132,12 +139,12 @@ This information includes:
 
 /// Clock frequency of the Test Domain Timer. Timer value is returned with \ref TIMESTAMP_GET.
 // 时间戳频率（不知道作用）
-#define TIMESTAMP_CLOCK         100000000U      ///< Timestamp clock in Hz (0 = timestamps not supported).
+#define TIMESTAMP_CLOCK         240000000U      ///< Timestamp clock in Hz (0 = timestamps not supported).
 
 /// Indicate that UART Communication Port is available.
 /// This information is returned by the command \ref DAP_Info as part of <b>Capabilities</b>.
 // 是否使能串口
-#define DAP_UART                1               ///< DAP UART:  1 = available, 0 = not available.
+#define DAP_UART                0               ///< DAP UART:  1 = available, 0 = not available.
 
 /// USART Driver instance number for the UART Communication Port.
 #define DAP_UART_DRIVER         1               ///< USART Driver instance number (Driver_USART#).
@@ -327,6 +334,11 @@ of the same I/O port. The following SWDIO I/O Pin functions are provided:
 
 
 // Configure DAP I/O pins ------------------------------
+#define PIN_SWDIO GPIO_NUM_8
+#define PIN_SWCLK GPIO_NUM_9
+#define PIN_nRESET GPIO_NUM_10
+#define PIN_LED_CONNECTED GPIO_NUM_17
+#define PIN_LED_RUNNING GPIO_NUM_18
 
 /** Setup JTAG I/O pins: TCK, TMS, TDI, TDO, nTRST, and nRESET.
 Configures the DAP Hardware I/O pins for JTAG mode:
@@ -345,7 +357,18 @@ Configures the DAP Hardware I/O pins for Serial Wire Debug (SWD) mode:
  SWD 引脚初始化
 */
 __STATIC_INLINE void PORT_SWD_SETUP (void) {
-  ;
+  gpio_config_t io_conf = {
+    .intr_type = GPIO_INTR_DISABLE,     // 无中断
+    .mode = GPIO_MODE_OUTPUT,
+    .pin_bit_mask = (1ULL << PIN_SWDIO) | (1ULL << PIN_SWCLK) | (1ULL << PIN_nRESET),
+    .pull_up_en = GPIO_PULLUP_DISABLE,
+    .pull_down_en = GPIO_PULLDOWN_DISABLE,
+  };
+  gpio_config(&io_conf);
+  
+  gpio_set_level(PIN_SWDIO, 1);
+  gpio_set_level(PIN_SWCLK, 1);
+  gpio_set_level(PIN_nRESET, 1);
 }
 
 /** Disable JTAG/SWD I/O Pins.
@@ -354,7 +377,18 @@ Disables the DAP Hardware I/O pins which configures:
  关闭JTAG/SWD引脚配置
 */
 __STATIC_INLINE void PORT_OFF (void) {
-  ;
+  gpio_config_t io_conf = {
+    .intr_type = GPIO_INTR_DISABLE,     
+    .mode = GPIO_MODE_INPUT,
+    .pin_bit_mask = (1ULL << PIN_SWDIO) | (1ULL << PIN_SWCLK) | (1ULL << PIN_nRESET),
+    .pull_up_en = GPIO_PULLUP_DISABLE,
+    .pull_down_en = GPIO_PULLDOWN_DISABLE,
+  };
+  gpio_config(&io_conf);
+  
+  gpio_set_level(PIN_SWDIO, 0);
+  gpio_set_level(PIN_SWCLK, 0);
+  gpio_set_level(PIN_nRESET, 0);
 }
 
 
@@ -365,7 +399,7 @@ __STATIC_INLINE void PORT_OFF (void) {
 获取引脚状态
 */
 __STATIC_FORCEINLINE uint32_t PIN_SWCLK_TCK_IN  (void) {
-  return (0U);
+  return (gpio_get_level(PIN_SWCLK));
 }
 
 /** SWCLK/TCK I/O pin: Set Output to High.
@@ -373,7 +407,7 @@ Set the SWCLK/TCK DAP hardware I/O pin to high level.
 设置引脚为高电平
 */
 __STATIC_FORCEINLINE void     PIN_SWCLK_TCK_SET (void) {
-  ;
+  gpio_set_level(PIN_SWCLK, 1);
 }
 
 /** SWCLK/TCK I/O pin: Set Output to Low.
@@ -381,7 +415,7 @@ Set the SWCLK/TCK DAP hardware I/O pin to low level.
 设置引脚为低电平
 */
 __STATIC_FORCEINLINE void     PIN_SWCLK_TCK_CLR (void) {
-  ;
+  gpio_set_level(PIN_SWCLK, 0);
 }
 
 
@@ -392,7 +426,8 @@ __STATIC_FORCEINLINE void     PIN_SWCLK_TCK_CLR (void) {
 获取引脚状态
 */
 __STATIC_FORCEINLINE uint32_t PIN_SWDIO_TMS_IN  (void) {
-  return (0U);
+  return (gpio_get_level(PIN_SWDIO));
+  return(0);
 }
 
 /** SWDIO/TMS I/O pin: Set Output to High.
@@ -400,7 +435,7 @@ Set the SWDIO/TMS DAP hardware I/O pin to high level.
 设置引脚为高电平
 */
 __STATIC_FORCEINLINE void     PIN_SWDIO_TMS_SET (void) {
-  ;
+  gpio_set_level(PIN_SWDIO, 1);
 }
 
 /** SWDIO/TMS I/O pin: Set Output to Low.
@@ -408,7 +443,7 @@ Set the SWDIO/TMS DAP hardware I/O pin to low level.
 设置引脚为低电平
 */
 __STATIC_FORCEINLINE void     PIN_SWDIO_TMS_CLR (void) {
-  ;
+  gpio_set_level(PIN_SWDIO, 0);
 }
 
 /** SWDIO I/O pin: Get Input (used in SWD mode only).
@@ -416,7 +451,7 @@ __STATIC_FORCEINLINE void     PIN_SWDIO_TMS_CLR (void) {
 获取引脚状态
 */
 __STATIC_FORCEINLINE uint32_t PIN_SWDIO_IN      (void) {
-  return (0U);
+  return ( gpio_get_level(PIN_SWDIO));
 }
 
 /** SWDIO I/O pin: Set Output (used in SWD mode only).
@@ -424,7 +459,14 @@ __STATIC_FORCEINLINE uint32_t PIN_SWDIO_IN      (void) {
 设置引脚为输出（？）
 */
 __STATIC_FORCEINLINE void     PIN_SWDIO_OUT     (uint32_t bit) {
-  ;
+  if((bit & 1U) == 1) 
+  {
+    gpio_set_level(PIN_SWDIO, 1);
+  }
+  else
+  {
+    gpio_set_level(PIN_SWDIO, 0);
+  }
 }
 
 /** SWDIO I/O pin: Switch to Output mode (used in SWD mode only).
@@ -433,7 +475,7 @@ called prior \ref PIN_SWDIO_OUT function calls.
 将引脚调整为输出模式
 */
 __STATIC_FORCEINLINE void     PIN_SWDIO_OUT_ENABLE  (void) {
-  ;
+  gpio_set_direction(PIN_SWDIO, GPIO_MODE_OUTPUT);
 }
 
 /** SWDIO I/O pin: Switch to Input mode (used in SWD mode only).
@@ -442,7 +484,7 @@ called prior \ref PIN_SWDIO_IN function calls.
 将引脚调整为输入模式
 */
 __STATIC_FORCEINLINE void     PIN_SWDIO_OUT_DISABLE (void) {
-  ;
+  gpio_set_direction(PIN_SWDIO, GPIO_MODE_INPUT);
 }
 
 
@@ -503,7 +545,7 @@ __STATIC_FORCEINLINE void     PIN_nTRST_OUT  (uint32_t bit) {
 获取引脚状态
 */
 __STATIC_FORCEINLINE uint32_t PIN_nRESET_IN  (void) {
-  return (0U);
+  return (gpio_get_level(PIN_nRESET));
 }
 
 /** nRESET I/O pin: Set Output.
@@ -513,7 +555,7 @@ __STATIC_FORCEINLINE uint32_t PIN_nRESET_IN  (void) {
 设置为输出
 */
 __STATIC_FORCEINLINE void     PIN_nRESET_OUT (uint32_t bit) {
-  ;
+  gpio_set_level(PIN_nRESET, bit);
 }
 
 ///@}
@@ -537,14 +579,18 @@ It is recommended to provide the following LEDs for status indication:
            - 1: Connect LED ON: debugger is connected to CMSIS-DAP Debug Unit.
            - 0: Connect LED OFF: debugger is not connected to CMSIS-DAP Debug Unit.
 */
-__STATIC_INLINE void LED_CONNECTED_OUT (uint32_t bit) {}
+__STATIC_INLINE void LED_CONNECTED_OUT (uint32_t bit) {
+  gpio_set_level(PIN_LED_CONNECTED, bit);
+}
 
 /** Debug Unit: Set status Target Running LED.
 \param bit status of the Target Running LED.
            - 1: Target Running LED ON: program execution in target started.
            - 0: Target Running LED OFF: program execution in target stopped.
 */
-__STATIC_INLINE void LED_RUNNING_OUT (uint32_t bit) {}
+__STATIC_INLINE void LED_RUNNING_OUT (uint32_t bit) {
+  gpio_set_level(PIN_LED_RUNNING, bit);
+}
 
 ///@}
 
@@ -592,7 +638,12 @@ Status LEDs. In detail the operation of Hardware I/O and LED pins are enabled an
  - LED output pins are enabled and LEDs are turned off.
 */
 __STATIC_INLINE void DAP_SETUP (void) {
-  ;
+  PORT_SWD_SETUP();
+
+  gpio_set_direction(PIN_LED_CONNECTED, GPIO_MODE_OUTPUT);
+  LED_CONNECTED_OUT(0);
+  gpio_set_direction(PIN_LED_RUNNING, GPIO_MODE_OUTPUT);
+  LED_RUNNING_OUT(0);
 }
 
 /** Reset Target Device with custom specific I/O pin or command sequence.

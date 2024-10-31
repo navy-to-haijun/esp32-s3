@@ -8,6 +8,7 @@ file(GLOB SRC_DIR_LIST
                   "CherryUSB/class/msc/*.c"
                   "CherryUSB/class/hub/*.c"
                   "CherryUSB/osal/idf/usb_osal_idf.c"
+                  "CherryUSB/third_party/cherryrb/chry_ringbuffer.c"
                   )
 file(GLOB INC_DIR_LIST 
                  "CherryUSB/core"
@@ -17,6 +18,8 @@ file(GLOB INC_DIR_LIST
                  "CherryUSB/common"
                  "CherryUSB/class/hub"
                   "CherryUSB/osal/idf"
+                  "CherryUSB/third_party/cherryrb"
+               
                  )
 idf_component_register(SRCS             ${SRC_DIR_LIST}
                        INCLUDE_DIRS     ${INC_DIR_LIST}
